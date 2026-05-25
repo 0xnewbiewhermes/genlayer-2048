@@ -88,9 +88,12 @@ export default function Home() {
   const sendTx = async (functionName: string, args: any[] = []) => {
     if (!ethereum || !account) { setMessage('Connect wallet first'); return; }
     try {
+      // GenLayer expects hex-encoded JSON in data field
+      const payload = JSON.stringify({ functionName, args });
+      const hexData = '0x' + Array.from(new TextEncoder().encode(payload)).map(b => b.toString(16).padStart(2, '0')).join('');
       const txHash = await ethereum.request({
         method: 'eth_sendTransaction',
-        params: [{ to: CONTRACT_ADDRESS, from: account, data: JSON.stringify({ functionName, args }) }],
+        params: [{ to: CONTRACT_ADDRESS, from: account, data: hexData }],
       });
       setMessage(`Tx sent: ${txHash.slice(0,10)}... Waiting for consensus...`);
       await new Promise(r => setTimeout(r, 5000));

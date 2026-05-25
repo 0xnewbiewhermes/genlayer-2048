@@ -12,7 +12,7 @@
       },
       "bradbury": {
         "chainId": 4221,
-        "rpc": "https://rpc-bradbury.genlayer.com",
+        "rpc": "https://rpc.testnet-chain.genlayer.com",
         "explorer": "https://explorer-bradbury.genlayer.com",
         "contractAddress": "0xf74a806A9B0A03e3442c9e68218d29eF51885021"
       }

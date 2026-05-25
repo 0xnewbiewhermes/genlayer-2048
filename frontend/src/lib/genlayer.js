@@ -9,7 +9,7 @@ const CONFIG = {
   },
   bradbury: {
     chain: bradbury,
-    rpc: "https://rpc-bradbury.genlayer.com",
+    rpc: "https://rpc.testnet-chain.genlayer.com",
     chainId: 4221,
   },
 };

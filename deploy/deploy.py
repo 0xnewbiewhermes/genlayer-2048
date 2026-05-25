@@ -19,7 +19,7 @@ CONFIG = {
         "chain_id": 61999,
     },
     "bradbury": {
-        "rpc": "https://rpc-bradbury.genlayer.com",
+        "rpc": "https://rpc.testnet-chain.genlayer.com",
         "chain_id": 4221,
     },
 }

@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 declare const ethereum: any;
 
 const CONTRACT_ADDRESS = '0xf74a806A9B0A03e3442c9e68218d29eF51885021';
-const GEN_RPC = 'https://rpc-bradbury.genlayer.com';
+const GEN_RPC = 'https://rpc.testnet-chain.genlayer.com';
 
 export default function Home() {
   const [account, setAccount] = useState<string | null>(null);

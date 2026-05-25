@@ -73,8 +73,8 @@ User → React Frontend → GenLayer Studio (Chain 61999)
 
 | Network | Chain ID | RPC | Contract |
 |---------|----------|-----|----------|
-| **Bradbury** | 4221 | `https://rpc-bradbury.genlayer.com` | `0xf74a806A9B0A03e3442c9e68218d29eF51885021` |
-| **Bradbury** | 4221 | `https://rpc-bradbury.genlayer.com` | *(deploy sendiri)* |
+| **Bradbury** | 4221 | `https://rpc.testnet-chain.genlayer.com` | `0xf74a806A9B0A03e3442c9e68218d29eF51885021` |
+| **Bradbury** | 4221 | `https://rpc.testnet-chain.genlayer.com` | *(deploy sendiri)* |
 
 ---
 

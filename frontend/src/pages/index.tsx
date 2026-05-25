@@ -33,10 +33,10 @@ export default function Home() {
             method: 'wallet_addEthereumChain',
             params: [{
               chainId: '0x1079',
-              chainName: 'GenLayer Bradbury Testnet',
+              chainName: 'GenLayer Testnet Chain',
               nativeCurrency: { name: 'GEN', symbol: 'GEN', decimals: 18 },
               rpcUrls: [GEN_RPC],
-              blockExplorerUrls: ['https://explorer-bradbury.genlayer.com'],
+              blockExplorerUrls: ['https://explorer.testnet-chain.genlayer.com'],
             }],
           });
         }
@@ -156,7 +156,7 @@ export default function Home() {
     <div className="container">
       <div className="header">
         <h1>2048</h1>
-        <span style={{ fontSize: 13, color: '#cdc1b4' }}>on GenLayer Bradbury</span>
+        <span style={{ fontSize: 13, color: '#cdc1b4' }}>on GenLayer Testnet Chain</span>
         <div className="scores" style={{ marginTop: 8 }}>
           <div className="score-box">
             <div className="label">Score</div>

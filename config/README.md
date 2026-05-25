@@ -5,7 +5,7 @@
 | Network | Chain ID | RPC URL | Explorer |
 |---------|----------|---------|----------|
 | Studio | 61999 | https://studio.genlayer.com/api | - |
-| Bradbury Testnet | 4221 | https://rpc.testnet-chain.genlayer.com | https://explorer-bradbury.genlayer.com |
+| Bradbury Testnet | 4221 | https://rpc.testnet-chain.genlayer.com | https://explorer.testnet-chain.genlayer.com |
 
 ## Contract
 

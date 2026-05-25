@@ -77,9 +77,18 @@ export default function Home() {
     if (!ethereum || !account) { setMessage('Connect wallet first'); return; }
     try {
       const serializedData = encodeFunctionCall(functionName, args);
+      // Estimate gas first
+      const gasEstimate = await ethereum.request({
+        method: 'eth_estimateGas',
+        params: [{ to: CONTRACT_ADDRESS, from: account, data: serializedData }],
+      });
+      // Get current gas price
+      const currentGasPrice = await ethereum.request({ method: 'eth_gasPrice', params: [] });
+      // Set gas price 20% above base fee
+      const gasPrice = (BigInt(currentGasPrice) * 120n / 100n).toString();
       const txHash = await ethereum.request({
         method: 'eth_sendTransaction',
-        params: [{ to: CONTRACT_ADDRESS, from: account, data: serializedData }],
+        params: [{ to: CONTRACT_ADDRESS, from: account, data: serializedData, gas: gasEstimate, gasPrice }],
       });
       setMessage(`Tx sent: ${txHash.slice(0,10)}... Waiting for consensus...`);
       // Wait for consensus before refreshing state

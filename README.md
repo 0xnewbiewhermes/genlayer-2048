@@ -2,7 +2,9 @@
 
 Full on-chain **2048 game** sebagai GenLayer Intelligent Contract. Setiap tile slide, merge, dan score di-validasi oleh **Optimistic Democracy** consensus dengan AI validators.
 
-Contract terdeploy di **Studio**: `0xf74a806A9B0A03e3442c9e68218d29eF51885021`
+Contract terdeploy di **Bradbury**: `0xf74a806A9B0A03e3442c9e68218d29eF51885021`
+
+**🔗 Live Demo: [http://15.235.207.98:3000](http://15.235.207.98:3000)**
 
 ---
 
@@ -71,7 +73,7 @@ User → React Frontend → GenLayer Studio (Chain 61999)
 
 | Network | Chain ID | RPC | Contract |
 |---------|----------|-----|----------|
-| **Studio** | 61999 | `https://studio.genlayer.com/api` | `0xf74a806A9B0A03e3442c9e68218d29eF51885021` |
+| **Bradbury** | 4221 | `https://rpc-bradbury.genlayer.com` | `0xf74a806A9B0A03e3442c9e68218d29eF51885021` |
 | **Bradbury** | 4221 | `https://rpc-bradbury.genlayer.com` | *(deploy sendiri)* |
 
 ---

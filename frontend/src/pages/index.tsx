@@ -1,136 +1,214 @@
-import { useState, useEffect } from 'react';
-import GameBoard from '../components/GameBoard';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
-const DEFAULT_CONTRACT = '0xf74a806A9B0A03e3442c9e68218d29eF51885021';
+declare const ethereum: any;
 
-function createMinimalClient(contractAddr, rpc) {
-  return {
-    contractAddress: contractAddr,
-    rpc: rpc || 'https://rpc-bradbury.genlayer.com',
-    async read(method, args = []) {
-      const res = await fetch(this.rpc, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          method: 'eth_call',
-          params: [{
-            to: this.contractAddress,
-            data: this._encode(method, args),
-          }, 'latest'],
-          id: 1,
-        }),
-      });
-      const data = await res.json();
-      return this._decode(data.result);
-    },
-    async write(method, args = []) {
-      const res = await fetch(this.rpc, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          method: 'eth_sendTransaction',
-          params: [{
-            to: this.contractAddress,
-            data: this._encode(method, args),
-          }],
-          id: 1,
-        }),
-      });
-      const data = await res.json();
-      return data.result;
-    },
-    _encode(method, args) {
-      return '0x' + method.split('').map(c => c.charCodeAt(0).toString(16)).join('');
-    },
-    _decode(hex) {
-      if (!hex) return null;
-      try {
-        return JSON.parse(Buffer.from(hex.slice(2), 'hex').toString());
-      } catch { return hex; }
-    },
-    async initGame() {
-      return this.write('init_game');
-    },
-    async move(direction) {
-      return this.write('move', [direction]);
-    },
-    async getState() {
-      return this.read('get_state');
-    },
-    async getGrid() {
-      return this.read('get_grid');
-    },
-  };
-}
+const CONTRACT_ADDRESS = '0xf74a806A9B0A03e3442c9e68218d29eF51885021';
+const GEN_RPC = 'https://rpc-bradbury.genlayer.com';
 
 export default function Home() {
-  const [contractAddr, setContractAddr] = useState(DEFAULT_CONTRACT);
-  const [client, setClient] = useState(null);
+  const [account, setAccount] = useState<string | null>(null);
+  const [grid, setGrid] = useState<number[][]>([[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]]);
+  const [score, setScore] = useState(0);
+  const [gameOver, setGameOver] = useState(false);
+  const [won, setWon] = useState(false);
+  const [moves, setMoves] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const touchStart = useRef<{x: number; y: number} | null>(null);
 
-  useEffect(() => {
-    const saved = localStorage.getItem('genlayer2048_contract');
-    if (saved) setContractAddr(saved);
-  }, []);
-
-  const connectContract = () => {
-    if (!contractAddr || !contractAddr.startsWith('0x')) {
-      alert('Enter a valid contract address (0x...)');
+  const connectWallet = async () => {
+    if (typeof ethereum === 'undefined') {
+      setMessage('Install MetaMask to play!');
       return;
     }
-    const c = createMinimalClient(contractAddr);
-    setClient(c);
-    localStorage.setItem('genlayer2048_contract', contractAddr);
+    try {
+      try {
+        await ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: '0x1079' }],
+        });
+      } catch (e: any) {
+        if (e.code === 4902) {
+          await ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [{
+              chainId: '0x1079',
+              chainName: 'GenLayer Bradbury Testnet',
+              nativeCurrency: { name: 'GEN', symbol: 'GEN', decimals: 18 },
+              rpcUrls: [GEN_RPC],
+              blockExplorerUrls: ['https://explorer-bradbury.genlayer.com'],
+            }],
+          });
+        }
+      }
+      const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+      setAccount(accounts[0]);
+      setMessage(`Connected: ${accounts[0].slice(0,6)}...${accounts[0].slice(-4)}`);
+    } catch (e: any) {
+      setMessage('Connection failed: ' + (e.message || e));
+    }
   };
 
-  // Auto-connect on load if default address is set
-  useEffect(() => {
-    if (contractAddr && !client) {
-      const c = createMinimalClient(contractAddr);
-      setClient(c);
+  const genCall = async (functionName: string, args: any[] = []) => {
+    const res = await fetch(GEN_RPC, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'gen_call',
+        params: [{ to: CONTRACT_ADDRESS, functionName, args }, 'latest'],
+        id: 1,
+      }),
+    });
+    const data = await res.json();
+    return data.result;
+  };
+
+  const fetchState = useCallback(async () => {
+    try {
+      const state = await genCall('get_state');
+      if (state?.grid && Array.isArray(state.grid)) {
+        setGrid(state.grid);
+        setScore(state.score || 0);
+        setGameOver(state.game_over || false);
+        setWon(state.won || false);
+        setMoves(state.moves || 0);
+      }
+    } catch (e) {
+      console.error('fetch error', e);
     }
   }, []);
+
+  useEffect(() => {
+    fetchState();
+    const interval = setInterval(fetchState, 4000);
+    return () => clearInterval(interval);
+  }, [fetchState]);
+
+  const sendTx = async (functionName: string, args: any[] = []) => {
+    if (!ethereum || !account) { setMessage('Connect wallet first'); return; }
+    try {
+      const txHash = await ethereum.request({
+        method: 'eth_sendTransaction',
+        params: [{ to: CONTRACT_ADDRESS, from: account, data: JSON.stringify({ functionName, args }) }],
+      });
+      setMessage(`Tx sent: ${txHash.slice(0,10)}... Waiting for consensus...`);
+      await new Promise(r => setTimeout(r, 5000));
+      await fetchState();
+      return txHash;
+    } catch (e: any) {
+      setMessage('Error: ' + (e.message || e));
+      throw e;
+    }
+  };
+
+  const startNewGame = async () => {
+    setLoading(true);
+    setMessage('');
+    try { await sendTx('init_game'); setMessage('New game started!'); }
+    catch (e) { setMessage('Error: ' + ((e as any).message || e)); }
+    setLoading(false);
+  };
+
+  const makeMove = async (direction: string) => {
+    if (gameOver) { setMessage('Game over! Start a new game.'); return; }
+    setLoading(true);
+    try { await sendTx('move', [direction]); }
+    catch (e) { /* message set by sendTx */ }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const map: Record<string, string> = {
+        ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+        w: 'up', s: 'down', a: 'left', d: 'right',
+      };
+      if (map[e.key]) { e.preventDefault(); makeMove(map[e.key]); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [gameOver, account]);
+
+  const handleTouchStart = (e: React.TouchEvent) => { touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStart.current) return;
+    const dx = e.changedTouches[0].clientX - touchStart.current.x;
+    const dy = e.changedTouches[0].clientY - touchStart.current.y;
+    if (Math.abs(dx) > Math.abs(dy)) {
+      if (Math.abs(dx) > 30) makeMove(dx > 0 ? 'right' : 'left');
+    } else {
+      if (Math.abs(dy) > 30) makeMove(dy > 0 ? 'down' : 'up');
+    }
+    touchStart.current = null;
+  };
+
+  const tileColor = (v: number) => {
+    const c: Record<number, string> = {
+      0: 'rgba(238,228,218,0.35)', 2: '#eee4da', 4: '#ede0c8', 8: '#f2b179',
+      16: '#f59563', 32: '#f67c5f', 64: '#f65e3b', 128: '#edcf72',
+      256: '#edcc61', 512: '#edc850', 1024: '#edc53f', 2048: '#edc22e',
+    };
+    return c[v] || '#3c3a32';
+  };
 
   return (
     <div className="container">
       <div className="header">
         <h1>2048</h1>
-        <div className="scores">
-          <span style={{ fontSize: 13, color: '#cdc1b4' }}>on GenLayer Bradbury</span>
+        <span style={{ fontSize: 13, color: '#cdc1b4' }}>on GenLayer Bradbury</span>
+        <div className="scores" style={{ marginTop: 8 }}>
+          <div className="score-box">
+            <div className="label">Score</div>
+            <div className="value">{score}</div>
+          </div>
+          <div className="score-box">
+            <div className="label">Moves</div>
+            <div className="value">{moves}</div>
+          </div>
         </div>
       </div>
 
-      {/* Contract Setup */}
       <div className="wallet-section">
-        <input
-          placeholder="Contract address (0x...)"
-          value={contractAddr}
-          onChange={(e) => setContractAddr(e.target.value)}
-        />
-        <button className="btn" onClick={connectContract}>
-          Connect
-        </button>
+        {!account ? (
+          <button className="btn" onClick={connectWallet} style={{ width: '100%', background: '#8f7a66' }}>
+            🦊 Connect MetaMask
+          </button>
+        ) : (
+          <>
+            <span style={{ fontSize: 12, color: '#cdc1b4', marginRight: 8 }}>
+              {account.slice(0,6)}...{account.slice(-4)}
+            </span>
+            <button className="btn" onClick={startNewGame} disabled={loading} style={{ flex: 1 }}>
+              {loading ? '⏳ Processing...' : '🎮 New Game'}
+            </button>
+          </>
+        )}
       </div>
 
-      {client ? (
-        <GameBoard contract={client} />
-      ) : (
-        <div style={{
-          background: '#bbada0', borderRadius: 8, padding: 48,
-          textAlign: 'center', color: 'white', marginTop: 16,
-        }}>
-          <h2 style={{ fontSize: 24, marginBottom: 12 }}>🎮 2048 on GenLayer</h2>
-          <p>Deployed at <code>{DEFAULT_CONTRACT.slice(0,10)}...{DEFAULT_CONTRACT.slice(-6)}</code></p>
-          <p style={{ fontSize: 13, marginTop: 8, opacity: 0.7 }}>
-            Connect to start playing
-          </p>
-        </div>
-      )}
+      {message && <p style={{ fontSize: 13, color: '#666', marginBottom: 8, textAlign: 'center' }}>{message}</p>}
 
-      <div style={{ marginTop: 20, fontSize: 12, color: '#cdc1b4', textAlign: 'center' }}>
+      <div className="board" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} style={{ touchAction: 'none' }}>
+        {grid.flat().map((val, i) => (
+          <div key={i} className="cell" style={{ background: tileColor(val), color: val <= 4 ? '#776e65' : '#f9f6f2' }}>
+            {val > 0 ? val : ''}
+          </div>
+        ))}
+        {gameOver && (
+          <div className="game-over-overlay">
+            <h2>{won ? '🎉 You Win!' : '💀 Game Over'}</h2>
+            <p>Score: {score} | Moves: {moves}</p>
+            <button className="btn" onClick={startNewGame} style={{ marginTop: 12 }}>Try Again</button>
+          </div>
+        )}
+      </div>
+
+      <p style={{ fontSize: 12, color: '#cdc1b4', textAlign: 'center', margin: '12px 0' }}>
+        ↑↓←→ or WASD or swipe &middot; {CONTRACT_ADDRESS.slice(0,10)}...{CONTRACT_ADDRESS.slice(-6)}
+      </p>
+      <div style={{ fontSize: 12, color: '#cdc1b4', textAlign: 'center' }}>
         <p>Built with GenLayer Intelligent Contracts + React</p>
-        <p>Each move is validated by Optimistic Democracy consensus</p>
+        <p>Add Bradbury testnet to MetaMask to play</p>
       </div>
     </div>
   );

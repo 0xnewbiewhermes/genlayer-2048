@@ -4,7 +4,7 @@ Full on-chain **2048 game** sebagai GenLayer Intelligent Contract. Setiap tile s
 
 Contract terdeploy di **Bradbury**: `0xf74a806A9B0A03e3442c9e68218d29eF51885021`
 
-**🔗 Live Demo: [http://15.235.207.98:3000](http://15.235.207.98:3000)**
+**🔗 Live Demo: [https://frontend-two-gray-16.vercel.app](https://frontend-two-gray-16.vercel.app)**
 
 ---
 

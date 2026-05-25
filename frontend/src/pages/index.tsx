@@ -3,7 +3,7 @@ import { encodeFunctionCall, readContract, CONTRACT_ADDRESS } from '../lib/genla
 
 declare const ethereum: any;
 
-const GEN_WRITE_RPC = 'https://rpc.testnet-chain.genlayer.com';
+const GEN_WRITE_RPC = 'https://rpc-bradbury.genlayer.com';
 
 export default function Home() {
   const [account, setAccount] = useState<string | null>(null);
@@ -25,7 +25,7 @@ export default function Home() {
       try {
         await ethereum.request({
           method: 'wallet_switchEthereumChain',
-          params: [{ chainId: '0x1079' }],
+          params: [{ chainId: '0x107d' }],
         });
       } catch (e: any) {
         if (e.code === 4902) {

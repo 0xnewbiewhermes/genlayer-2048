@@ -1,0 +1,21 @@
+{
+  "Game2048": {
+    "name": "Game2048",
+    "description": "Full on-chain 2048 game as GenLayer Intelligent Contract",
+    "version": "1.0.0",
+    "file": "Game2048.py",
+    "constructor": {},
+    "networks": {
+      "studio": {
+        "chainId": 61999,
+        "rpc": "https://studio.genlayer.com/api",
+        "explorer": ""
+      },
+      "bradbury": {
+        "chainId": 4221,
+        "rpc": "https://rpc-bradbury.genlayer.com",
+        "explorer": "https://explorer-bradbury.genlayer.com"
+      }
+    }
+  }
+}

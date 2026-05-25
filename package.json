@@ -1,0 +1,12 @@
+{
+  "name": "genlayer-2048",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "deploy": "python deploy/deploy.py",
+    "deploy:studio": "python deploy/deploy.py --network studio",
+    "deploy:bradbury": "python deploy/deploy.py --network bradbury",
+    "frontend": "cd frontend && npm run dev",
+    "test": "python -m pytest tests/"
+  }
+}

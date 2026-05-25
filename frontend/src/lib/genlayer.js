@@ -1,6 +1,5 @@
 const { createClient } = require("genlayer-js");
 const { studionet, bradbury } = require("genlayer-js/chains");
-const { ethers } = require("ethers");
 
 const CONFIG = {
   studio: {
@@ -16,8 +15,8 @@ const CONFIG = {
 };
 
 class Game2048Client {
-  constructor(contractAddress, network = "bradbury", accountAddress) {
-    this.network = CONFIG[network] || CONFIG.bradbury;
+  constructor(contractAddress, network = "studio", accountAddress) {
+    this.network = CONFIG[network] || CONFIG.studio;
     this.contractAddress = contractAddress;
     this.client = createClient({
       chain: this.network.chain,
@@ -33,66 +32,26 @@ class Game2048Client {
     });
   }
 
-  async move(gameId, direction) {
+  async move(direction) {
     return this.client.write({
       address: this.contractAddress,
       functionName: "move",
-      args: [gameId, direction],
+      args: [direction],
     });
   }
 
-  async getGame(gameId) {
+  async getState() {
     return this.client.read({
       address: this.contractAddress,
-      functionName: "get_game",
-      args: [gameId],
-    });
-  }
-
-  async getGrid(gameId) {
-    return this.client.read({
-      address: this.contractAddress,
-      functionName: "get_grid",
-      args: [gameId],
-    });
-  }
-
-  async getScore(gameId) {
-    return this.client.read({
-      address: this.contractAddress,
-      functionName: "get_score",
-      args: [gameId],
-    });
-  }
-
-  async getGameStatus(gameId) {
-    return this.client.read({
-      address: this.contractAddress,
-      functionName: "get_game_status",
-      args: [gameId],
-    });
-  }
-
-  async getPlayerGames() {
-    return this.client.read({
-      address: this.contractAddress,
-      functionName: "get_player_games",
+      functionName: "get_state",
       args: [],
     });
   }
 
-  async getHighScore(playerAddress) {
+  async getGrid() {
     return this.client.read({
       address: this.contractAddress,
-      functionName: "get_high_score",
-      args: [playerAddress],
-    });
-  }
-
-  async getLeaderboard() {
-    return this.client.read({
-      address: this.contractAddress,
-      functionName: "get_leaderboard",
+      functionName: "get_grid",
       args: [],
     });
   }

@@ -9,7 +9,6 @@ const TILE_COLORS = {
 };
 
 export default function GameBoard({ contract }) {
-  const [gameId, setGameId] = useState(null);
   const [grid, setGrid] = useState([[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]]);
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
@@ -17,16 +16,11 @@ export default function GameBoard({ contract }) {
   const [moves, setMoves] = useState(0);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [leaderboard, setLeaderboard] = useState({});
-  const [contractAddress, setContractAddress] = useState(
-    process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || ''
-  );
-  const gameIdInput = useRef(null);
 
-  const fetchGame = useCallback(async (gid) => {
-    if (!contract || !gid) return;
+  const fetchState = useCallback(async () => {
+    if (!contract) return;
     try {
-      const data = await contract.getGame(gid);
+      const data = await contract.getState();
       if (data && data.grid) {
         setGrid(data.grid);
         setScore(data.score);
@@ -39,33 +33,26 @@ export default function GameBoard({ contract }) {
     }
   }, [contract]);
 
-  // Poll game state every 3 seconds if game is active
+  // Poll game state every 3 seconds
   useEffect(() => {
-    if (!gameId || !contract) return;
-    const interval = setInterval(() => fetchGame(gameId), 3000);
+    if (!contract) return;
+    fetchState();
+    const interval = setInterval(fetchState, 3000);
     return () => clearInterval(interval);
-  }, [gameId, contract, fetchGame]);
+  }, [contract, fetchState]);
 
   const startNewGame = async () => {
     if (!contract) {
-      setMessage('Connect wallet or set contract address first');
+      setMessage('Connect contract first');
       return;
     }
     setLoading(true);
     setMessage('');
     try {
-      const result = await contract.initGame();
-      // Wait for tx to confirm, then fetch game id
+      await contract.initGame();
       await new Promise(r => setTimeout(r, 3000));
-      // Get player games to find latest
-      const games = await contract.getPlayerGames();
-      if (games && games.length > 0) {
-        const latest = games[games.length - 1];
-        setGameId(latest);
-        gameIdInput.current.value = latest;
-        await fetchGame(latest);
-        setMessage('New game started!');
-      }
+      await fetchState();
+      setMessage('New game started!');
     } catch (e) {
       setMessage('Error: ' + (e.message || e));
     }
@@ -73,8 +60,8 @@ export default function GameBoard({ contract }) {
   };
 
   const makeMove = async (direction) => {
-    if (!gameId || !contract) {
-      setMessage('Start a game first');
+    if (!contract) {
+      setMessage('Connect contract first');
       return;
     }
     if (gameOver) {
@@ -83,37 +70,13 @@ export default function GameBoard({ contract }) {
     }
     setLoading(true);
     try {
-      await contract.move(gameId, direction);
-      await new Promise(r => setTimeout(r, 2000)); // wait for consensus
-      await fetchGame(gameId);
-
-      // Refresh leaderboard
-      try {
-        const lb = await contract.getLeaderboard();
-        setLeaderboard(lb || {});
-      } catch (_) {}
+      await contract.move(direction);
+      await new Promise(r => setTimeout(r, 2000));
+      await fetchState();
     } catch (e) {
       setMessage('Error: ' + (e.message || e));
     }
     setLoading(false);
-  };
-
-  const loadGame = async () => {
-    const gid = gameIdInput.current?.value;
-    if (!gid) return;
-    setGameId(gid);
-    await fetchGame(gid);
-    setMessage('Game loaded!');
-  };
-
-  const refreshLeaderboard = async () => {
-    if (!contract) return;
-    try {
-      const lb = await contract.getLeaderboard();
-      setLeaderboard(lb || {});
-    } catch (e) {
-      console.error(e);
-    }
   };
 
   // Keyboard controls
@@ -131,7 +94,7 @@ export default function GameBoard({ contract }) {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [gameId, gameOver, contract, loading]);
+  }, [gameOver, contract, loading]);
 
   // Touch/swipe support
   const touchStart = useRef(null);
@@ -153,14 +116,8 @@ export default function GameBoard({ contract }) {
 
   return (
     <div>
-      {/* Contract Address */}
-      <div className="wallet-section">
-        <input
-          ref={gameIdInput}
-          placeholder="Game ID (optional)"
-          style={{ flex: '0 0 auto', width: '160px' }}
-        />
-        <button className="btn" onClick={loadGame}>Load</button>
+      {/* Controls */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
         <button className="btn" onClick={startNewGame} disabled={loading}>
           {loading ? 'Processing...' : 'New Game'}
         </button>
@@ -210,40 +167,6 @@ export default function GameBoard({ contract }) {
       <p style={{ fontSize: 12, color: '#cdc1b4', textAlign: 'center', marginBottom: 16 }}>
         Arrow keys or swipe to move &middot; WASD also works
       </p>
-
-      {/* Leaderboard */}
-      <div className="leaderboard">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3>🏆 Leaderboard</h3>
-          <button className="btn" onClick={refreshLeaderboard} style={{ padding: '6px 12px', fontSize: 12 }}>
-            Refresh
-          </button>
-        </div>
-        {Object.keys(leaderboard).length > 0 ? (
-          <table>
-            <thead>
-              <tr>
-                <th>Rank</th>
-                <th>Player</th>
-                <th>Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(leaderboard).slice(0, 10).map(([addr, sc], i) => (
-                <tr key={addr}>
-                  <td>{i + 1}</td>
-                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
-                    {addr.slice(0, 6)}...{addr.slice(-4)}
-                  </td>
-                  <td>{sc}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <p style={{ fontSize: 13, color: '#cdc1b4' }}>No scores yet. Start playing!</p>
-        )}
-      </div>
     </div>
   );
 }

@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import GameBoard from '../components/GameBoard';
 
-// Minimal genlayer-js client setup
-// In production, use full genlayer-js SDK
+const DEFAULT_CONTRACT = '0xf74a806A9B0A03e3442c9e68218d29eF51885021';
+
 function createMinimalClient(contractAddr, rpc) {
   return {
     contractAddress: contractAddr,
-    rpc: rpc || 'https://rpc-bradbury.genlayer.com',
-    async call(method, args = []) {
+    rpc: rpc || 'https://studio.genlayer.com/api',
+    async read(method, args = []) {
       const res = await fetch(this.rpc, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -24,8 +24,24 @@ function createMinimalClient(contractAddr, rpc) {
       const data = await res.json();
       return this._decode(data.result);
     },
+    async write(method, args = []) {
+      const res = await fetch(this.rpc, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'eth_sendTransaction',
+          params: [{
+            to: this.contractAddress,
+            data: this._encode(method, args),
+          }],
+          id: 1,
+        }),
+      });
+      const data = await res.json();
+      return data.result;
+    },
     _encode(method, args) {
-      // Simplified encoding - in production use genlayer-js SDK
       return '0x' + method.split('').map(c => c.charCodeAt(0).toString(16)).join('');
     },
     _decode(hex) {
@@ -34,32 +50,25 @@ function createMinimalClient(contractAddr, rpc) {
         return JSON.parse(Buffer.from(hex.slice(2), 'hex').toString());
       } catch { return hex; }
     },
-    // Direct genlayer-js style methods
     async initGame() {
-      return this.call('init_game');
+      return this.write('init_game');
     },
-    async move(gameId, direction) {
-      return this.call('move', [gameId, direction]);
+    async move(direction) {
+      return this.write('move', [direction]);
     },
-    async getGame(gameId) {
-      return this.call('get_game', [gameId]);
+    async getState() {
+      return this.read('get_state');
     },
-    async getPlayerGames() {
-      return this.call('get_player_games');
-    },
-    async getLeaderboard() {
-      return this.call('get_leaderboard');
+    async getGrid() {
+      return this.read('get_grid');
     },
   };
 }
 
 export default function Home() {
-  const [contractAddr, setContractAddr] = useState('');
+  const [contractAddr, setContractAddr] = useState(DEFAULT_CONTRACT);
   const [client, setClient] = useState(null);
-  const [walletConnected, setWalletConnected] = useState(false);
-  const [account, setAccount] = useState('');
 
-  // Try reading from env / localStorage
   useEffect(() => {
     const saved = localStorage.getItem('genlayer2048_contract');
     if (saved) setContractAddr(saved);
@@ -75,27 +84,20 @@ export default function Home() {
     localStorage.setItem('genlayer2048_contract', contractAddr);
   };
 
-  const connectWallet = async () => {
-    if (typeof window.ethereum !== 'undefined') {
-      try {
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        setAccount(accounts[0]);
-        setWalletConnected(true);
-      } catch (e) {
-        alert('Wallet connection failed');
-      }
-    } else {
-      alert('Install MetaMask to use full features');
-      setWalletConnected(false);
+  // Auto-connect on load if default address is set
+  useEffect(() => {
+    if (contractAddr && !client) {
+      const c = createMinimalClient(contractAddr);
+      setClient(c);
     }
-  };
+  }, []);
 
   return (
     <div className="container">
       <div className="header">
         <h1>2048</h1>
         <div className="scores">
-          <span style={{ fontSize: 13, color: '#cdc1b4' }}>on GenLayer</span>
+          <span style={{ fontSize: 13, color: '#cdc1b4' }}>on GenLayer Studio</span>
         </div>
       </div>
 
@@ -109,9 +111,6 @@ export default function Home() {
         <button className="btn" onClick={connectContract}>
           Connect
         </button>
-        <button className="btn" onClick={connectWallet} style={{ background: walletConnected ? '#22c55e' : '#8f7a66' }}>
-          {walletConnected ? `✓ ${account.slice(0,6)}...` : '🦊 Wallet'}
-        </button>
       </div>
 
       {client ? (
@@ -122,9 +121,9 @@ export default function Home() {
           textAlign: 'center', color: 'white', marginTop: 16,
         }}>
           <h2 style={{ fontSize: 24, marginBottom: 12 }}>🎮 2048 on GenLayer</h2>
-          <p>Enter the contract address above to start playing</p>
+          <p>Deployed at <code>{DEFAULT_CONTRACT.slice(0,10)}...{DEFAULT_CONTRACT.slice(-6)}</code></p>
           <p style={{ fontSize: 13, marginTop: 8, opacity: 0.7 }}>
-            Deploy Game2048.py to Bradbury Testnet first
+            Connect to start playing
           </p>
         </div>
       )}

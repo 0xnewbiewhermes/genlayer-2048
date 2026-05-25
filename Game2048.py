@@ -1,7 +1,9 @@
 # { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 
 import json
+from dataclasses import dataclass
 from genlayer import *
+import random
 
 
 GRID_SIZE = 4
@@ -27,56 +29,32 @@ class Game2048(gl.Contract):
     def __init__(self):
         self.game_counter = u256(0)
 
-    # ============ INTERNAL HELPERS ============
-
-    def _get_empty_cells(self, grid: list) -> list:
-        """Get coordinates of all empty cells (value == 0)."""
-        empty = []
-        for r in range(GRID_SIZE):
-            for c in range(GRID_SIZE):
-                if grid[r][c] == 0:
-                    empty.append((r, c))
-        return empty
-
-    def _has_empty(self, grid: list) -> bool:
-        for r in range(GRID_SIZE):
-            for c in range(GRID_SIZE):
-                if grid[r][c] == 0:
-                    return True
-        return False
+    # ============ GAME LOGIC ============
 
     def _init_grid(self) -> list:
-        """Create empty 4x4 grid and add 2 random tiles.
-        Uses stdin-based seed for deterministic random."""
+        """Create empty 4x4 grid and add 2 random tiles."""
         grid = [[0] * GRID_SIZE for _ in range(GRID_SIZE)]
 
-        def place_two_tiles() -> str:
-            # First tile
-            import hashlib
-            f = __import__('sys').stdin.buffer
-            f.seek(0)
-            h = hashlib.sha256(f.read()).hexdigest()
-            seed = int(h[:16], 16)
+        def place_random() -> str:
+            empty = []
+            for r in range(GRID_SIZE):
+                for c in range(GRID_SIZE):
+                    if grid[r][c] == 0:
+                        empty.append((r, c))
+            if not empty:
+                return json.dumps(grid)
 
-            # Use seed to pick positions
-            empty1 = [(r, c) for r in range(GRID_SIZE) for c in range(GRID_SIZE) if grid[r][c] == 0]
-            idx1 = seed % len(empty1)
-            val1 = 2 if seed % 10 != 0 else 4
-            grid[empty1[idx1][0]][empty1[idx1][1]] = val1
-
-            # Second tile (offset seed)
-            empty2 = [(r, c) for r in range(GRID_SIZE) for c in range(GRID_SIZE) if grid[r][c] == 0]
-            if empty2:
-                idx2 = (seed >> 8) % len(empty2)
-                val2 = 2 if (seed >> 4) % 10 != 0 else 4
-                grid[empty2[idx2][0]][empty2[idx2][1]] = val2
-
+            pos = random.choice(empty)
+            val = 2 if random.random() < 0.9 else 4
+            grid[pos[0]][pos[1]] = val
             return json.dumps(grid)
 
-        return json.loads(gl.eq_principle.strict_eq(place_two_tiles))
+        result = json.loads(gl.eq_principle.strict_eq(place_random))
+        return result
 
     def _slide_left(self, row: list) -> tuple:
         """Slide a single row to the left. Returns (new_row, score_gained)."""
+        # Remove zeros
         tiles = [v for v in row if v != 0]
         score_gained = 0
         merged = []
@@ -106,7 +84,11 @@ class Game2048(gl.Contract):
     def _transpose(self, grid: list) -> list:
         return [list(row) for row in zip(*grid)]
 
+    def _reverse_rows(self, grid: list) -> list:
+        return [row[::-1] for row in grid]
+
     def _move_left(self, grid: list) -> tuple:
+        """Slide entire grid left. Returns (new_grid, total_score, changed)."""
         new_grid = []
         total_score = 0
         changed = False
@@ -145,22 +127,20 @@ class Game2048(gl.Contract):
         return self._transpose(moved), score, changed
 
     def _spawn_tile(self, grid: list) -> list:
-        """Add one random tile (2 or 4) in an empty cell.
-        Uses stdin-based seed for deterministic random."""
-        def pick_spot() -> str:
-            import hashlib
-            f = __import__('sys').stdin.buffer
-            f.seek(0)
-            h = hashlib.sha256(f.read()).hexdigest()
-            seed = int(h[:16], 16)
+        """Add one random tile (2 or 4) in an empty cell."""
 
-            flat = [(r, c) for r in range(GRID_SIZE) for c in range(GRID_SIZE) if grid[r][c] == 0]
+        def pick_spot() -> str:
+            flat = []
+            for r in range(GRID_SIZE):
+                for c in range(GRID_SIZE):
+                    if grid[r][c] == 0:
+                        flat.append((r, c))
             if not flat:
                 return json.dumps(grid)
 
-            pos = seed % len(flat)
-            val = 2 if seed % 10 != 0 else 4
-            grid[flat[pos][0]][flat[pos][1]] = val
+            pos = random.choice(flat)
+            val = 2 if random.random() < 0.9 else 4
+            grid[pos[0]][pos[1]] = val
             return json.dumps(grid)
 
         return json.loads(gl.eq_principle.strict_eq(pick_spot))
@@ -324,5 +304,6 @@ class Game2048(gl.Contract):
         result = {}
         for addr, score in self.high_scores.items():
             result[addr.as_hex] = int(score)
+        # Sort by score descending, take top 10
         sorted_scores = sorted(result.items(), key=lambda x: -x[1])[:10]
         return dict(sorted_scores)

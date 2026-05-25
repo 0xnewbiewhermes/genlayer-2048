@@ -90,7 +90,8 @@
           from: ACCOUNT,
           data: deployData,
           gas: '0x989680', // 10,000,000 gas — under 30M cap
-          gasPrice: '0x3b9aca00', // 1 gwei
+          maxFeePerGas: '0x2540be400', // 10 gwei — way above basefee
+          maxPriorityFeePerGas: '0x0', // 0 priority (testnet)
         }],
       })
       .then(txHash => {

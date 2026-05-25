@@ -3,7 +3,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 declare const ethereum: any;
 
 const CONTRACT_ADDRESS = '0xf74a806A9B0A03e3442c9e68218d29eF51885021';
-const GEN_RPC = 'https://rpc.testnet-chain.genlayer.com';
+const GEN_READ_RPC = 'https://rpc-bradbury.genlayer.com';    // for gen_call reads
+const GEN_WRITE_RPC = 'https://rpc.testnet-chain.genlayer.com'; // for MetaMask
 
 export default function Home() {
   const [account, setAccount] = useState<string | null>(null);
@@ -35,7 +36,7 @@ export default function Home() {
               chainId: '0x1079',
               chainName: 'GenLayer Testnet Chain',
               nativeCurrency: { name: 'GEN', symbol: 'GEN', decimals: 18 },
-              rpcUrls: [GEN_RPC],
+              rpcUrls: [GEN_WRITE_RPC],
               blockExplorerUrls: ['https://explorer.testnet-chain.genlayer.com'],
             }],
           });
@@ -50,17 +51,19 @@ export default function Home() {
   };
 
   const genCall = async (functionName: string, args: any[] = []) => {
-    const res = await fetch(GEN_RPC, {
+    // Use old RPC which supports gen_call with functionName/args format
+    const res = await fetch(GEN_READ_RPC, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
         method: 'gen_call',
-        params: [{ to: CONTRACT_ADDRESS, functionName, args }, 'latest'],
+        params: [{ to: CONTRACT_ADDRESS, functionName, args }],
         id: 1,
       }),
     });
     const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
     return data.result;
   };
 
@@ -211,7 +214,7 @@ export default function Home() {
       </p>
       <div style={{ fontSize: 12, color: '#cdc1b4', textAlign: 'center' }}>
         <p>Built with GenLayer Intelligent Contracts + React</p>
-        <p>Add Bradbury testnet to MetaMask to play</p>
+        <p>Add GenLayer Testnet Chain to MetaMask to play</p>
       </div>
     </div>
   );

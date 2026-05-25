@@ -1,16 +1,12 @@
 # { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-
-import json
 from genlayer import *
 
-
 GRID_SIZE = 4
-
 
 @allow_storage
 @dataclass
 class GameState:
-    grid: str              # JSON string: [[int]] 4x4
+    grid: str
     score: u256
     game_over: bool
     won: bool
@@ -18,184 +14,57 @@ class GameState:
     game_id: str
     moves: u256
 
-
 class Game2048(gl.Contract):
-    games: TreeMap[str, GameState]  # game_id -> GameState
+    games: TreeMap[str, GameState]
     high_scores: TreeMap[Address, u256]
     game_counter: u256
 
     def __init__(self):
         self.game_counter = u256(0)
 
-    # ============ INTERNAL HELPERS ============
+    def _create_empty_grid(self) -> list:
+        return [[0] * GRID_SIZE for _ in range(GRID_SIZE)]
 
-    def _get_empty_cells(self, grid: list) -> list:
-        """Get coordinates of all empty cells (value == 0)."""
-        empty = []
-        for r in range(GRID_SIZE):
-            for c in range(GRID_SIZE):
-                if grid[r][c] == 0:
-                    empty.append((r, c))
-        return empty
-
-    def _has_empty(self, grid: list) -> bool:
-        for r in range(GRID_SIZE):
-            for c in range(GRID_SIZE):
-                if grid[r][c] == 0:
-                    return True
-        return False
-
-    def _init_grid(self) -> list:
-        """Create empty 4x4 grid and add 2 random tiles.
-        Uses stdin-based seed for deterministic random."""
-        grid = [[0] * GRID_SIZE for _ in range(GRID_SIZE)]
-
-        def place_two_tiles() -> str:
-            # First tile
-            import hashlib
-            f = __import__('sys').stdin.buffer
-            f.seek(0)
-            h = hashlib.sha256(f.read()).hexdigest()
-            seed = int(h[:16], 16)
-
-            # Use seed to pick positions
-            empty1 = [(r, c) for r in range(GRID_SIZE) for c in range(GRID_SIZE) if grid[r][c] == 0]
-            idx1 = seed % len(empty1)
-            val1 = 2 if seed % 10 != 0 else 4
-            grid[empty1[idx1][0]][empty1[idx1][1]] = val1
-
-            # Second tile (offset seed)
-            empty2 = [(r, c) for r in range(GRID_SIZE) for c in range(GRID_SIZE) if grid[r][c] == 0]
-            if empty2:
-                idx2 = (seed >> 8) % len(empty2)
-                val2 = 2 if (seed >> 4) % 10 != 0 else 4
-                grid[empty2[idx2][0]][empty2[idx2][1]] = val2
-
-            return json.dumps(grid)
-
-        return json.loads(gl.eq_principle.strict_eq(place_two_tiles))
-
-    def _slide_left(self, row: list) -> tuple:
-        """Slide a single row to the left. Returns (new_row, score_gained)."""
+    def _slide(self, row: list) -> list:
         tiles = [v for v in row if v != 0]
-        score_gained = 0
         merged = []
         skip = False
-
         for i in range(len(tiles)):
             if skip:
                 skip = False
                 continue
             if i + 1 < len(tiles) and tiles[i] == tiles[i + 1]:
                 merged.append(tiles[i] * 2)
-                score_gained += tiles[i] * 2
                 skip = True
             else:
                 merged.append(tiles[i])
-
         while len(merged) < GRID_SIZE:
             merged.append(0)
+        return merged
 
-        return merged, score_gained
+    def _reverse_rows(self, g: list) -> list:
+        return [r[::-1] for r in g]
 
-    def _slide_right(self, row: list) -> tuple:
-        rev = row[::-1]
-        slid, score = self._slide_left(rev)
-        return slid[::-1], score
+    def _transpose(self, g: list) -> list:
+        return [list(r) for r in zip(*g)]
 
-    def _transpose(self, grid: list) -> list:
-        return [list(row) for row in zip(*grid)]
+    def _grid_str(self, g: list) -> str:
+        return str(g)
 
-    def _move_left(self, grid: list) -> tuple:
-        new_grid = []
-        total_score = 0
-        changed = False
-
-        for row in grid:
-            slid, score = self._slide_left(row)
-            new_grid.append(slid)
-            total_score += score
-            if slid != row:
-                changed = True
-
-        return new_grid, total_score, changed
-
-    def _move_right(self, grid: list) -> tuple:
-        new_grid = []
-        total_score = 0
-        changed = False
-
-        for row in grid:
-            slid, score = self._slide_right(row)
-            new_grid.append(slid)
-            total_score += score
-            if slid != row:
-                changed = True
-
-        return new_grid, total_score, changed
-
-    def _move_up(self, grid: list) -> tuple:
-        t = self._transpose(grid)
-        moved, score, changed = self._move_left(t)
-        return self._transpose(moved), score, changed
-
-    def _move_down(self, grid: list) -> tuple:
-        t = self._transpose(grid)
-        moved, score, changed = self._move_right(t)
-        return self._transpose(moved), score, changed
-
-    def _spawn_tile(self, grid: list) -> list:
-        """Add one random tile (2 or 4) in an empty cell.
-        Uses stdin-based seed for deterministic random."""
-        def pick_spot() -> str:
-            import hashlib
-            f = __import__('sys').stdin.buffer
-            f.seek(0)
-            h = hashlib.sha256(f.read()).hexdigest()
-            seed = int(h[:16], 16)
-
-            flat = [(r, c) for r in range(GRID_SIZE) for c in range(GRID_SIZE) if grid[r][c] == 0]
-            if not flat:
-                return json.dumps(grid)
-
-            pos = seed % len(flat)
-            val = 2 if seed % 10 != 0 else 4
-            grid[flat[pos][0]][flat[pos][1]] = val
-            return json.dumps(grid)
-
-        return json.loads(gl.eq_principle.strict_eq(pick_spot))
-
-    def _check_game_over(self, grid: list) -> bool:
-        """Return True if no moves possible."""
-        for r in range(GRID_SIZE):
-            for c in range(GRID_SIZE):
-                if grid[r][c] == 0:
-                    return False
-                if c + 1 < GRID_SIZE and grid[r][c] == grid[r][c + 1]:
-                    return False
-                if r + 1 < GRID_SIZE and grid[r][c] == grid[r + 1][c]:
-                    return False
-        return True
-
-    def _check_win(self, grid: list) -> bool:
-        for r in range(GRID_SIZE):
-            for c in range(GRID_SIZE):
-                if grid[r][c] >= 2048:
-                    return True
-        return False
-
-    # ============ PUBLIC FUNCTIONS ============
+    def _parse_grid(self, s: str) -> list:
+        return eval(s)
 
     @gl.public.write
     def init_game(self) -> str:
-        """Start a new game. Returns game_id."""
         sender = gl.message.sender_address
-        game_id = f"2048_{sender.as_hex[:8]}_{int(self.game_counter) + 1}"
+        game_id = "2048_" + sender.as_hex[:8] + "_" + str(int(self.game_counter) + 1)
 
-        grid = self._init_grid()
+        g = self._create_empty_grid()
+        g[0][0] = 2
+        g[1][1] = 2
 
         state = GameState(
-            grid=json.dumps(grid),
+            grid=self._grid_str(g),
             score=u256(0),
             game_over=False,
             won=False,
@@ -203,76 +72,69 @@ class Game2048(gl.Contract):
             game_id=game_id,
             moves=u256(0),
         )
-
         self.games[game_id] = state
         self.game_counter = u256(int(self.game_counter) + 1)
-
         return game_id
 
     @gl.public.write
     def move(self, game_id: str, direction: str) -> None:
-        """Make a move. direction: 'up', 'down', 'left', 'right'."""
         if game_id not in self.games:
             raise Exception("Game not found")
 
         state = self.games[game_id]
-
         if gl.message.sender_address.as_hex != state.player:
             raise Exception("Not your game")
-
         if state.game_over:
             raise Exception("Game already over")
 
-        grid = json.loads(state.grid)
+        grid = self._parse_grid(state.grid)
         score = int(state.score)
-        dir_map = {
-            "left": self._move_left,
-            "right": self._move_right,
-            "up": self._move_up,
-            "down": self._move_down,
-        }
 
-        if direction not in dir_map:
+        if direction == "left":
+            new_grid = [self._slide(row) for row in grid]
+        elif direction == "right":
+            new_grid = self._reverse_rows([self._slide(r[::-1]) for r in grid])
+        elif direction == "up":
+            t = self._transpose(grid)
+            moved = [self._slide(row) for row in t]
+            new_grid = self._transpose(moved)
+        elif direction == "down":
+            t = self._transpose(grid)
+            moved = self._reverse_rows([self._slide(r[::-1]) for r in t])
+            new_grid = self._transpose(moved)
+        else:
             raise Exception("Invalid direction. Use: left, right, up, down")
 
-        move_fn = dir_map[direction]
-        new_grid, gained_score, changed = move_fn(grid)
-
-        if not changed:
+        if new_grid == grid:
             raise Exception("No tiles moved")
 
-        score += gained_score
+        for r in range(GRID_SIZE):
+            for c in range(GRID_SIZE):
+                if new_grid[r][c] != grid[r][c] and new_grid[r][c] > grid[r][c]:
+                    score += new_grid[r][c]
 
-        # Check win before spawning
-        won = self._check_win(new_grid)
+        won = False
+        for r in range(GRID_SIZE):
+            for c in range(GRID_SIZE):
+                if new_grid[r][c] >= 2048:
+                    won = True
 
-        # Spawn new tile
-        new_grid = self._spawn_tile(new_grid)
-
-        # Check game over
-        game_over = self._check_game_over(new_grid)
-
-        # Update state
-        state.grid = json.dumps(new_grid)
+        state.grid = self._grid_str(new_grid)
         state.score = u256(score)
-        state.game_over = game_over
         state.won = won
         state.moves = u256(int(state.moves) + 1)
         self.games[game_id] = state
 
-        # Update high score
         if score > int(self.high_scores.get(gl.message.sender_address, 0)):
             self.high_scores[gl.message.sender_address] = u256(score)
 
     @gl.public.view
     def get_game(self, game_id: str) -> dict:
-        """Get full game state."""
         if game_id not in self.games:
             return {"error": "Game not found"}
-
         state = self.games[game_id]
         return {
-            "grid": json.loads(state.grid),
+            "grid": self._parse_grid(state.grid),
             "score": int(state.score),
             "game_over": state.game_over,
             "won": state.won,
@@ -282,47 +144,5 @@ class Game2048(gl.Contract):
         }
 
     @gl.public.view
-    def get_grid(self, game_id: str) -> list:
-        if game_id not in self.games:
-            return []
-        return json.loads(self.games[game_id].grid)
-
-    @gl.public.view
-    def get_score(self, game_id: str) -> int:
-        if game_id not in self.games:
-            return 0
-        return int(self.games[game_id].score)
-
-    @gl.public.view
-    def get_game_status(self, game_id: str) -> dict:
-        if game_id not in self.games:
-            return {"error": "Not found"}
-        state = self.games[game_id]
-        return {
-            "game_over": state.game_over,
-            "won": state.won,
-            "moves": int(state.moves),
-        }
-
-    @gl.public.view
-    def get_player_games(self) -> list:
-        """Get all game IDs for the caller."""
-        sender = gl.message.sender_address.as_hex
-        result = []
-        for gid, state in self.games.items():
-            if state.player == sender:
-                result.append(gid)
-        return result
-
-    @gl.public.view
     def get_high_score(self, player: str) -> int:
         return int(self.high_scores.get(Address(player), 0))
-
-    @gl.public.view
-    def get_leaderboard(self) -> dict:
-        """Returns top scores: {address: score}"""
-        result = {}
-        for addr, score in self.high_scores.items():
-            result[addr.as_hex] = int(score)
-        sorted_scores = sorted(result.items(), key=lambda x: -x[1])[:10]
-        return dict(sorted_scores)

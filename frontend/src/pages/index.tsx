@@ -58,7 +58,7 @@ export default function Home() {
       body: JSON.stringify({
         jsonrpc: '2.0',
         method: 'gen_call',
-        params: [{ to: CONTRACT_ADDRESS, functionName, args }],
+        params: [{ to: CONTRACT_ADDRESS, functionName, args, type: 'read' }],
         id: 1,
       }),
     });
@@ -91,8 +91,8 @@ export default function Home() {
   const sendTx = async (functionName: string, args: any[] = []) => {
     if (!ethereum || !account) { setMessage('Connect wallet first'); return; }
     try {
-      // GenLayer expects hex-encoded JSON in data field
-      const payload = JSON.stringify({ functionName, args });
+      // GenLayer expects hex-encoded {"method":"..."} in data field
+      const payload = JSON.stringify({ method: functionName, args: args.length > 0 ? args : undefined });
       const hexData = '0x' + Array.from(new TextEncoder().encode(payload)).map(b => b.toString(16).padStart(2, '0')).join('');
       const txHash = await ethereum.request({
         method: 'eth_sendTransaction',

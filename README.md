@@ -1,45 +1,65 @@
 # 🎮 2048 on GenLayer
 
-Full on-chain **2048 game** sebagai GenLayer Intelligent Contract. Setiap tile slide, merge, dan score di-validasi oleh **Optimistic Democracy** consensus dengan AI validators.
-
-Contract terdeploy di **Bradbury**: `0xf74a806A9B0A03e3442c9e68218d29eF51885021`
+Full on-chain **2048 game** as GenLayer Intelligent Contract. Setiap tile slide, merge, dan score di-validasi oleh **Optimistic Democracy** consensus dengan AI validators.
 
 **🔗 Live Demo: [https://frontend-two-gray-16.vercel.app](https://frontend-two-gray-16.vercel.app)**
 
----
+## Cara Main
 
-## 📋 Step-by-Step Guide
+1. Buka [Live Demo](https://frontend-two-gray-16.vercel.app)
+2. Klik **Connect MetaMask** → switch ke **GenLayer Testnet Chain** (otomatis)
+3. Klik **New Game** → confirm transaksi MetaMask
+4. Main pake ↑↓←→ atau WASD atau swipe
 
-### Step 1: Deploy Contract ke Studio
+## 🚀 Deploy Contract ke Testnet Chain
 
-1. Buka [studio.genlayer.com/contracts](https://studio.genlayer.com/contracts)
-2. Upload `contracts/Game2048.py`
-3. Klik **Deploy** → tunggu status **ACCEPTED**
-4. Catat contract address yang muncul
+Contract perlu di-deploy ke **GenLayer Testnet Chain** (Chain ID: 4221).
 
----
+### Option A: Via MetaMask (recommended)
 
-### Step 2: Test Contract di Studio
+1. Buka [Explorer](https://explorer.testnet-chain.genlayer.com)
+2. Dapatkan GEN dari faucet (via Portal/Studio)
+3. Buka MetaMask → switch ke GenLayer Testnet Chain
+4. Settings → Advanced → **Show hex data**
+5. Kirim transaksi custom:
+   - **To**: `0x0000000000000000000000000000000000000000`
+   - **Data**: (generate dengan script di bawah)
+   - **Value**: `0`
 
-**Test `init_game`:** Atur grid awal dengan tile [2] di (0,0) dan (1,1)
-**Test `get_state`:** Lihat grid, score, game_over status
-**Test `move("left")`:** Tile geser ke kiri, merge
-**Test `get_state` lagi:** Cek perubahan grid & score
-
----
-
-### Step 3: Jalankan Frontend
-
+**Generate deploy hex data:**
 ```bash
 cd frontend
-npm install
-export NEXT_PUBLIC_CONTRACT_ADDRESS=0xf74a806A9B0A03e3442c9e68218d29eF51885021
-npm run dev
+node ../deploy/generate-deploy-hex.js --tx
 ```
 
-Buka http://localhost:3000 — langsung Connect & main!
+Copy output JSON ke MetaMask.
 
----
+### Option B: Via Studio + SDK
+
+1. Upload `contracts/Game2048.py` ke [Studio](https://studio.genlayer.com/contracts)
+2. Deploy di Studio (chain 61999 — testing aja)
+3. Untuk produksi, deploy ulang ke Testnet Chain via script di atas
+
+## Contract Address
+
+| Network | Chain ID | RPC | Contract |
+|---------|----------|-----|----------|
+| **Studio** | 61999 | `https://studio.genlayer.com/api` | *(deploy sendiri)* |
+| **Testnet Chain** | 4221 | `https://rpc.testnet-chain.genlayer.com` | `0xf74a806A9B0A03e3442c9e68218d29eF51885021` (WIP) |
+
+> **⚠️ Contract address di atas perlu di-redeploy** — contract sebelumnya cuma ada di Studio chain.
+
+## 🧱 Architecture
+
+```
+User → React Frontend → GenLayer Testnet Chain (4221)
+                          ↓
+              Game2048 Intelligent Contract
+                          ↓
+                Validator AI Network (OD)
+                          ↓
+                  Game State On-Chain
+```
 
 ## 📜 Smart Contract Functions
 
@@ -50,42 +70,21 @@ Buka http://localhost:3000 — langsung Connect & main!
 | `get_state()` | view | Grid, score, game_over, won, moves |
 | `get_grid()` | view | Grid 4x4 aja |
 
-## 🧪 Testing
-
-```bash
-python tests/test_game2048.py
-```
-10 test cases: slide left/right/up/down, merge, gap, triple, game-over, win.
-
-## 🏗 Architecture
-
-```
-User → React Frontend → GenLayer Studio (Chain 61999)
-                          ↓
-              Game2048 Intelligent Contract
-                          ↓
-                Validator AI Network (OD)
-                          ↓
-                  Game State On-Chain
-```
-
 ## 🌐 Networks
 
-| Network | Chain ID | RPC | Contract |
-|---------|----------|-----|----------|
-| **Bradbury** | 4221 | `https://rpc.testnet-chain.genlayer.com` | `0xf74a806A9B0A03e3442c9e68218d29eF51885021` |
-| **Bradbury** | 4221 | `https://rpc.testnet-chain.genlayer.com` | *(deploy sendiri)* |
-
----
+- **Testnet Chain**: Chain ID 4221, RPC `https://rpc.testnet-chain.genlayer.com`
+- **Bradbury (read)**: RPC `https://rpc-bradbury.genlayer.com` (supports `gen_call`)
+- **Studio**: Chain ID 61999, RPC `https://studio.genlayer.com/api`
 
 ## 🚀 Submit ke GenLayer Portal
 
 1. Buka [portal.genlayer.foundation](https://portal.genlayer.foundation)
-2. Connect wallet → **Submit a contribution**
-3. Pilih kategori:
-   - **Project Contribution** → link repo GitHub
+2. Connect wallet → **Submit Contribution**
+3. Isi:
+   - **Kategori**: Project Contribution
+   - **Link repo**: `https://github.com/0xnewbiewhermes/genlayer-2048`
    - **Deskripsi**: "2048 game as an on-chain Intelligent Contract on GenLayer. All game logic runs on-chain (slide, merge, score, win/loss detection) with Optimistic Democracy consensus. Includes React frontend."
-   - **Tags**: `game`, `2048`, `intelligent-contract`, `python`, `react`
+   - **Tags**: `game` `2048` `intelligent-contract` `python` `react`
 
 ## 📝 License
 

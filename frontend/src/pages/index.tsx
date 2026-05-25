@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { encodeFunctionCall, readContract, CONTRACT_ADDRESS } from '../lib/genlayer';
 
 declare const ethereum: any;
 
-const CONTRACT_ADDRESS = '0xf74a806A9B0A03e3442c9e68218d29eF51885021';
-const GEN_READ_RPC = 'https://rpc-bradbury.genlayer.com';    // for gen_call reads
-const GEN_WRITE_RPC = 'https://rpc.testnet-chain.genlayer.com'; // for MetaMask
+const GEN_WRITE_RPC = 'https://rpc.testnet-chain.genlayer.com';
 
 export default function Home() {
   const [account, setAccount] = useState<string | null>(null);
@@ -50,32 +49,18 @@ export default function Home() {
     }
   };
 
-  const genCall = async (functionName: string, args: any[] = []) => {
-    // Use old RPC which supports gen_call with functionName/args format
-    const res = await fetch(GEN_READ_RPC, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        method: 'gen_call',
-        params: [{ to: CONTRACT_ADDRESS, functionName, args, type: 'read' }],
-        id: 1,
-      }),
-    });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message);
-    return data.result;
-  };
-
   const fetchState = useCallback(async () => {
     try {
-      const state = await genCall('get_state');
-      if (state?.grid && Array.isArray(state.grid)) {
-        setGrid(state.grid);
-        setScore(state.score || 0);
-        setGameOver(state.game_over || false);
-        setWon(state.won || false);
-        setMoves(state.moves || 0);
+      const state = await readContract('get_state');
+      if (state && typeof state === 'object') {
+        // genlayer-js SDK decode returns {grid, score, game_over, won, moves}
+        if (state.grid && Array.isArray(state.grid)) {
+          setGrid(state.grid);
+        }
+        if (typeof state.score === 'number') setScore(state.score);
+        if (typeof state.game_over === 'boolean') setGameOver(state.game_over);
+        if (typeof state.won === 'boolean') setWon(state.won);
+        if (typeof state.moves === 'number') setMoves(state.moves);
       }
     } catch (e) {
       console.error('fetch error', e);
@@ -91,15 +76,14 @@ export default function Home() {
   const sendTx = async (functionName: string, args: any[] = []) => {
     if (!ethereum || !account) { setMessage('Connect wallet first'); return; }
     try {
-      // GenLayer expects hex-encoded {"method":"..."} in data field
-      const payload = JSON.stringify({ method: functionName, args: args.length > 0 ? args : undefined });
-      const hexData = '0x' + Array.from(new TextEncoder().encode(payload)).map(b => b.toString(16).padStart(2, '0')).join('');
+      const serializedData = encodeFunctionCall(functionName, args);
       const txHash = await ethereum.request({
         method: 'eth_sendTransaction',
-        params: [{ to: CONTRACT_ADDRESS, from: account, data: hexData }],
+        params: [{ to: CONTRACT_ADDRESS, from: account, data: serializedData }],
       });
       setMessage(`Tx sent: ${txHash.slice(0,10)}... Waiting for consensus...`);
-      await new Promise(r => setTimeout(r, 5000));
+      // Wait for consensus before refreshing state
+      await new Promise(r => setTimeout(r, functionName === 'init_game' ? 10000 : 5000));
       await fetchState();
       return txHash;
     } catch (e: any) {
@@ -111,8 +95,12 @@ export default function Home() {
   const startNewGame = async () => {
     setLoading(true);
     setMessage('');
-    try { await sendTx('init_game'); setMessage('New game started!'); }
-    catch (e) { setMessage('Error: ' + ((e as any).message || e)); }
+    try {
+      await sendTx('init_game');
+      setMessage('🎮 Game started! Use arrow keys or swipe.');
+    } catch (e) {
+      setMessage('Error: ' + ((e as any).message || e));
+    }
     setLoading(false);
   };
 
@@ -210,7 +198,7 @@ export default function Home() {
       </div>
 
       <p style={{ fontSize: 12, color: '#cdc1b4', textAlign: 'center', margin: '12px 0' }}>
-        ↑↓←→ or WASD or swipe &middot; {CONTRACT_ADDRESS.slice(0,10)}...{CONTRACT_ADDRESS.slice(-6)}
+        ↑↓←→ or WASD or swipe · {CONTRACT_ADDRESS.slice(0,10)}...{CONTRACT_ADDRESS.slice(-6)}
       </p>
       <div style={{ fontSize: 12, color: '#cdc1b4', textAlign: 'center' }}>
         <p>Built with GenLayer Intelligent Contracts + React</p>

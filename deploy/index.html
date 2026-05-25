@@ -100,13 +100,23 @@
       try {
         const calldata = buildCalldata(ACCOUNT);
         
-        const gasRes = await fetch(BRADBURY_RPC, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_gasPrice', params: [], id: 1 }),
-        });
-        const gasData = await gasRes.json();
-        const basefee = BigInt(gasData.result);
-        const maxFeePerGas = '0x' + (basefee * 3n + 1000000000n).toString(16);
+        let maxFeePerGas;
+        try {
+          const gasRes = await fetch(BRADBURY_RPC, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_gasPrice', params: [], id: 1 }),
+          });
+          const gasData = await gasRes.json();
+          if (gasData.result) {
+            const basefee = BigInt(gasData.result);
+            maxFeePerGas = '0x' + (basefee * 3n + 1000000000n).toString(16);
+          } else {
+            throw new Error('RPC error');
+          }
+        } catch(e) {
+          // Fallback: RPC down, use static gas
+          maxFeePerGas = '0xba43b7400'; // 50 gwei
+        }
 
         s.innerText = '⏳ Kirim tx ke consensus contract...';
 

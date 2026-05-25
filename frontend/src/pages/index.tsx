@@ -6,7 +6,7 @@ const DEFAULT_CONTRACT = '0xf74a806A9B0A03e3442c9e68218d29eF51885021';
 function createMinimalClient(contractAddr, rpc) {
   return {
     contractAddress: contractAddr,
-    rpc: rpc || 'https://studio.genlayer.com/api',
+    rpc: rpc || 'https://rpc-bradbury.genlayer.com',
     async read(method, args = []) {
       const res = await fetch(this.rpc, {
         method: 'POST',
@@ -97,7 +97,7 @@ export default function Home() {
       <div className="header">
         <h1>2048</h1>
         <div className="scores">
-          <span style={{ fontSize: 13, color: '#cdc1b4' }}>on GenLayer Studio</span>
+          <span style={{ fontSize: 13, color: '#cdc1b4' }}>on GenLayer Bradbury</span>
         </div>
       </div>
 
